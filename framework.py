@@ -1,24 +1,57 @@
 import utils
+from broof import BROOF
+
+import xgboost as xgb
+
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import accuracy_score
 
 
 class Framework():
 
     def __init__(self):
         self.__datasets = utils.get_all_datasets_full_path()
-        self.__counter = 0
+        self.counter = 0
+        self.model_wins = 0
 
     def start(self):
         for ds in self.__datasets:
-            self.__counter += 1
-            # split to train_test
-            X, y = utils.split_datasets_to_x_y(ds)
+            self.counter += 1
+            print(f'\n\nDataset: {ds}')
+            X, y = utils.preprocess_data(ds)
+            n_classes = utils.get_num_of_classes(y)
             X_train, X_test, y_train, y_test = utils.split_to_train_test(X, y)
-            self.fit_and_predict(X_train, X_test, y_train, y_test)
-        print('yallaaaaaaaaaaaaa')
+            self.fit_and_predict(X_train, X_test, y_train, y_test, n_classes)
+
+        print(f'model won in {self.model_wins} \ {self.counter}')
 
 
-    def fit_and_predict(self, X_train, X_test, y_train, y_test):
-        print(self.__counter)
+
+    def fit_and_predict(self, X_train, X_test, y_train, y_test, n_classes):
+        print(self.counter)
+        model = BROOF(X_train, y_train, X_test, y_test, 10, 5)
+        model.Train()
+        y_pred = model.predict()
+        accuracy = accuracy_score(y_test, y_pred)
+
+        # XGBoost classifier
+        xgb_acc = self.xgb_classifier(X_train, y_train, X_test, y_test, n_classes)
+        print(f"\n----- model: {accuracy} , xgb: {xgb_acc} -----\n")
+
+        if accuracy >= xgb_acc:
+            self.model_wins += 1
+            winner = 'model'
+        else:
+            winner = 'xgb'
+
+        print(f'Winner: {winner}')
+
+
+    def xgb_classifier(self, X_train, y_train, X_test, y_test, n_classes):
+        xgb_model = xgb.XGBClassifier(random_state=42)
+        xgb_model.fit(X_train, y_train)
+        y_pred = xgb_model.predict(X_test)
+        return accuracy_score(y_test, y_pred)
 
 
 if __name__ == '__main__':
