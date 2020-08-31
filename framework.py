@@ -5,7 +5,7 @@ import xgboost as xgb
 
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import accuracy_score
-from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import RandomizedSearchCV
 
 
 class Framework():
@@ -31,10 +31,17 @@ class Framework():
     def fit_and_predict(self, X_train, X_test, y_train, y_test, n_classes):
         print(self.counter)
         model = BROOF(M=10, n_trees=5)
-        cv_scores = cross_val_score(model, X_train, y_train, scoring='accuracy', cv=10)
-        print(cv_scores)
-        model.fit(X_train, y_train)
-        y_pred = model.predict(X_test)
+        # param_dist = {'M': [3, 5, 7, 10],
+        #               'n_trees': [3, 5, 7, 10]}
+        param_dist = {'M': [2, 3, 4, 5,  6, 7, 8, 9],
+                      'n_trees': [2, 3, 4, 5,  6, 7, 8, 9]}
+        broof_cv = RandomizedSearchCV(model, param_dist, n_iter=50, scoring='accuracy', cv=3)
+        broof_cv.fit(X_train, y_train)
+        print("Tuned Decision Tree Parameters: {}".format(broof_cv.best_params_))
+        print("Best score is {}".format(broof_cv.best_score_))
+
+        best_model = broof_cv.best_estimator_
+        y_pred = best_model.predict(X_test)
         accuracy = accuracy_score(y_test, y_pred)
 
         # XGBoost classifier

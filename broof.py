@@ -108,3 +108,8 @@ class BROOF:
         }
 
         return out
+
+    def set_params(self, **params):
+        self.n_trees = params['n_trees']
+        self.M = params['M']
+        return self
