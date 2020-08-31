@@ -28,7 +28,7 @@ class BROOF:
         # Line 3:
         for t in range(self.M):
             # Line 4:
-            model, unsampled_indices = self.learn_rf(X_train, y_train)
+            model, unsampled_indices = self.learn_rf(X_train, y_train, t)
 
             # Append the single weak classifiers to a list which is later on used to make the weighted decision
             self.models.append(model)
@@ -62,8 +62,8 @@ class BROOF:
             for items in oob_samples_weights.iteritems():
                 Evaluation.at[items[0], 'weights'] = items[1]
 
-    def learn_rf(self, X_train, y_train):
-        rf_model = RandomForestClassifier(n_estimators=self.n_trees, bootstrap=True, verbose=0)
+    def learn_rf(self, X_train, y_train, t):
+        rf_model = RandomForestClassifier(n_estimators=self.n_trees, bootstrap=True, random_state=t, verbose=0)
 
         model = rf_model.fit(X_train, y_train)
 

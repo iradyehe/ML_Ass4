@@ -37,8 +37,8 @@ class Framework():
                       'n_trees': [2, 3, 4, 5,  6, 7, 8, 9]}
         broof_cv = RandomizedSearchCV(model, param_dist, n_iter=50, scoring='accuracy', cv=3)
         broof_cv.fit(X_train, y_train)
-        print("Tuned Decision Tree Parameters: {}".format(broof_cv.best_params_))
-        print("Best score is {}".format(broof_cv.best_score_))
+        #print("Tuned Decision Tree Parameters: {}".format(broof_cv.best_params_))
+        #print("Best score is {}".format(broof_cv.best_score_))
 
         best_model = broof_cv.best_estimator_
         y_pred = best_model.predict(X_test)
