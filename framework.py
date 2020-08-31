@@ -5,6 +5,7 @@ import xgboost as xgb
 
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import accuracy_score
+from sklearn.model_selection import cross_val_score
 
 
 class Framework():
@@ -29,9 +30,11 @@ class Framework():
 
     def fit_and_predict(self, X_train, X_test, y_train, y_test, n_classes):
         print(self.counter)
-        model = BROOF(X_train, y_train, X_test, y_test, 10, 5)
-        model.Train()
-        y_pred = model.predict()
+        model = BROOF(M=10, n_trees=5)
+        cv_scores = cross_val_score(model, X_train, y_train, scoring='accuracy', cv=10)
+        print(cv_scores)
+        model.fit(X_train, y_train)
+        y_pred = model.predict(X_test)
         accuracy = accuracy_score(y_test, y_pred)
 
         # XGBoost classifier

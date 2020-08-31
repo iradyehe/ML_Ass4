@@ -7,12 +7,7 @@ from sklearn.ensemble import RandomForestClassifier
 
 class BROOF:
 
-    def __init__(self, X_train, y_train, X_test, y_test, M, n_trees):
-        self.X_train = X_train
-        self.y_train = y_train
-
-        self.X_test = X_test
-        self.y_test = y_test
+    def __init__(self, M, n_trees):
 
         self.M = M
         self.n_trees = n_trees
@@ -21,23 +16,23 @@ class BROOF:
         self.models = []
 
     # Line 1:
-    def Train(self):
+    def fit(self, X_train, y_train):
 
         # Initialize the weights of each sample with wi = 1/N and create a dataframe in which the evaluation is computed
-        Evaluation = pd.DataFrame(self.y_train.copy())
+        Evaluation = pd.DataFrame(y_train.copy())
         Evaluation.rename(columns={0: 'target'}, inplace=True)
 
         # Line 2:
-        Evaluation['weights'] = 1 / self.y_train.shape[0]  # Set the initial weights w = 1/N
+        Evaluation['weights'] = 1 / y_train.shape[0]  # Set the initial weights w = 1/N
 
         # Line 3:
         for t in range(self.M):
             # Line 4:
-            model, unsampled_indices = self.learn_rf()
+            model, unsampled_indices = self.learn_rf(X_train, y_train)
 
             # Append the single weak classifiers to a list which is later on used to make the weighted decision
             self.models.append(model)
-            predictions = model.predict(self.X_train)
+            predictions = model.predict(X_train)
 
             # Add values to the Evaluation DataFrame
             Evaluation['predictions'] = predictions
@@ -67,13 +62,12 @@ class BROOF:
             for items in oob_samples_weights.iteritems():
                 Evaluation.at[items[0], 'weights'] = items[1]
 
-    def learn_rf(self):
-        self.X_train, self.y_train, self.n_trees
+    def learn_rf(self, X_train, y_train):
         rf_model = RandomForestClassifier(n_estimators=self.n_trees, bootstrap=True, verbose=0)
 
-        model = rf_model.fit(self.X_train, self.y_train)
+        model = rf_model.fit(X_train, y_train)
 
-        n_samples = self.X_train.shape[0]
+        n_samples = X_train.shape[0]
         num_estimators = len(model.estimators_)
         unsampled_indices = _generate_unsampled_indices(
             model.estimators_[0].random_state, n_samples,
@@ -87,11 +81,11 @@ class BROOF:
 
         return model, unsampled_indices
 
-    def predict(self):
+    def predict(self, X_test):
         predictions = []
 
         for alpha, model in zip(self.alphas, self.models):
-            pred_poba = model.predict_proba(self.X_test)
+            pred_poba = model.predict_proba(X_test)
             y_pred = alpha * pred_poba
             predictions.append(y_pred)
 
@@ -106,3 +100,11 @@ class BROOF:
             arg_maxes = np.argmax(temp_calc, axis=1)
 
         return arg_maxes
+
+    def get_params(self, deep=True):
+        out = {
+            'M': self.M,
+            'n_trees': self.n_trees
+        }
+
+        return out
