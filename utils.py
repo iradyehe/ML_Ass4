@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import os
 
 from os import listdir
 from os.path import isfile, join
@@ -14,6 +15,27 @@ def get_all_datasets_full_path():
 
 def get_all_files_path_in_folder(folder_path):
     return [join(folder_path, f) for f in listdir(folder_path) if isfile(join(folder_path, f))]
+
+
+def get_filename(path):
+    head, tail = head, tail = os.path.split(path)
+    return os.path.splitext(tail)[0]
+
+
+def create_csv_output_file():
+    path = 'output.csv'
+    headers = 'Dataset Name,Algorithm Name,Cross Validation [1 - 10],Hyper-Parameters Values,Accuracy,TPR,FPR, ' \
+              'Precision,AUC,PR-Curve,Training Time,Inference Time\n'
+
+    with open(path, "w") as file:
+        file.write(headers)
+
+    return path
+
+
+def append_to_csv_file(path, line):
+    with open(path, 'a') as file:
+        file.write(line + '\n')
 
 
 def split_datasets_to_x_y(data):
@@ -55,7 +77,10 @@ def split_to_train_test(X, y, test_size=0.3, random_state=123):
     return train_test_split(X, y, test_size=test_size, random_state=random_state)
 
 
-def get_num_of_classes(y):
+def get_classes_names(y):
     classes = np.unique(y)
-    return len(classes)
+    return classes
 
+
+def dict_to_str(my_dict):
+    return ''.join(f'{key}: {str(val)} | ' for key, val in my_dict.items())

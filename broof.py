@@ -81,21 +81,40 @@ class BROOF:
 
         return model, unsampled_indices
 
+    def predict_proba(self, X_test):
+        predictions = []
+        sum_alphas = np.sum(self.alphas, axis=0)
+        if sum_alphas == 0:
+            for alpha, model in zip(self.alphas, self.models):
+                pred_poba = model.predict_proba(X_test)
+                predictions.append(pred_poba)
+            sum_pred = np.sum(np.array(predictions), axis=0)
+            temp_calc = sum_pred / len(self.alphas)
+        else:
+            for alpha, model in zip(self.alphas, self.models):
+                pred_poba = model.predict_proba(X_test)
+                y_pred = alpha * pred_poba
+                predictions.append(y_pred)
+            sum_pred = np.sum(np.array(predictions), axis=0)
+            temp_calc = sum_pred / sum_alphas
+        return temp_calc
+
     def predict(self, X_test):
         predictions = []
-
-        for alpha, model in zip(self.alphas, self.models):
-            pred_poba = model.predict_proba(X_test)
-            y_pred = alpha * pred_poba
-            predictions.append(y_pred)
-
-        # Calc majority voting
-        sum_pred = np.sum(np.array(predictions), axis=0)
         sum_alphas = np.sum(self.alphas, axis=0)
-
         if sum_alphas == 0:
-            arg_maxes = np.zeros(sum_pred.shape[0], dtype=np.int)
+            for alpha, model in zip(self.alphas, self.models):
+                pred_poba = model.predict_proba(X_test)
+                predictions.append(pred_poba)
+            sum_pred = np.sum(np.array(predictions), axis=0)
+            temp_calc = sum_pred / len(self.alphas)
+            arg_maxes = np.argmax(temp_calc, axis=1)
         else:
+            for alpha, model in zip(self.alphas, self.models):
+                pred_poba = model.predict_proba(X_test)
+                y_pred = alpha * pred_poba
+                predictions.append(y_pred)
+            sum_pred = np.sum(np.array(predictions), axis=0)
             temp_calc = sum_pred / sum_alphas
             arg_maxes = np.argmax(temp_calc, axis=1)
 

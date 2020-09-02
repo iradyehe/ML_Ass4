@@ -1,11 +1,12 @@
 import utils
+import time
 from broof import BROOF
 
 import xgboost as xgb
 
-from sklearn.metrics import confusion_matrix
-from sklearn.metrics import accuracy_score
+from sklearn import metrics
 from sklearn.model_selection import RandomizedSearchCV
+from sklearn.model_selection import KFold
 
 
 class Framework():
@@ -14,54 +15,129 @@ class Framework():
         self.__datasets = utils.get_all_datasets_full_path()
         self.counter = 0
         self.model_wins = 0
+        self.output_csv_file_path = utils.create_csv_output_file()
 
     def start(self):
         for ds in self.__datasets:
-            self.counter += 1
-            print(f'\n\nDataset: {ds}')
+            self.current_dataset_name = utils.get_filename(ds)
             X, y = utils.preprocess_data(ds)
-            n_classes = utils.get_num_of_classes(y)
-            X_train, X_test, y_train, y_test = utils.split_to_train_test(X, y)
-            self.fit_and_predict(X_train, X_test, y_train, y_test, n_classes)
+            self.classes_names = utils.get_classes_names(y)
+            self.num_of_classes = len(self.classes_names)
+            self.k_folds_cross_validation(X, y)
 
         print(f'model won in {self.model_wins} \ {self.counter}')
 
+    def k_folds_cross_validation(self, X, y):
+        kf = KFold(n_splits=10, shuffle=False)
+        self.cv_iteration_number = 1
+        for train_index, test_index in kf.split(X):
+            # Split train-test
+            X_train, X_test = X[train_index], X[test_index]
+            y_train, y_test = y[train_index], y[test_index]
 
+            # Train the model
+            self.fit_and_predict(X_train, X_test, y_train, y_test)
 
-    def fit_and_predict(self, X_train, X_test, y_train, y_test, n_classes):
-        print(self.counter)
+            self.cv_iteration_number += 1
+
+    def fit_and_predict(self, X_train, X_test, y_train, y_test):
+        # BROOF model training & testing
+        broof_cv = self.broof_classiefier()
+        best_broof, best_params, train_time = self.randomized_search_fit(broof_cv, X_train, y_train)
+        best_params_str = utils.dict_to_str(best_params)
+        value_dict = self.predicting(best_broof, X_test, y_test)
+        self.write_result_table_to_file('BROOF', best_params_str, value_dict, train_time)
+
+        # XGBoost model training & testing
+        xgb_cv = self.xgb_classifier()
+        best_xgb, best_params, train_time = self.randomized_search_fit(xgb_cv, X_train, y_train)
+        value_dict = self.predicting(best_xgb, X_test, y_test)
+        self.write_result_table_to_file('XGBoost', best_params_str, value_dict, train_time)
+
+    def randomized_search_fit(self, model, X_train, y_train):
+        print("Randomized search..")
+        search_start_time = time.time()
+        model.fit(X_train, y_train)
+        train_time = time.time() - search_start_time
+        return model.best_estimator_, model.best_params_, train_time
+
+    def randomized_search_creation(self, model, params):
+        return RandomizedSearchCV(model, params, n_iter=50, scoring='accuracy', cv=3)
+
+    def broof_classiefier(self):
         model = BROOF(M=10, n_trees=5)
-        # param_dist = {'M': [3, 5, 7, 10],
-        #               'n_trees': [3, 5, 7, 10]}
-        param_dist = {'M': [2, 3, 4, 5,  6, 7, 8, 9],
-                      'n_trees': [2, 3, 4, 5,  6, 7, 8, 9]}
-        broof_cv = RandomizedSearchCV(model, param_dist, n_iter=50, scoring='accuracy', cv=3)
-        broof_cv.fit(X_train, y_train)
-        #print("Tuned Decision Tree Parameters: {}".format(broof_cv.best_params_))
-        #print("Best score is {}".format(broof_cv.best_score_))
+        param_dist = {'M': [2, 5, 10, 15],
+                      'n_trees': [5, 10, 15, 20]}
 
-        best_model = broof_cv.best_estimator_
-        y_pred = best_model.predict(X_test)
-        accuracy = accuracy_score(y_test, y_pred)
+        model_cv = self.randomized_search_creation(model, param_dist)
+        return model_cv
 
-        # XGBoost classifier
-        xgb_acc = self.xgb_classifier(X_train, y_train, X_test, y_test, n_classes)
-        print(f"\n----- model: {accuracy} , xgb: {xgb_acc} -----\n")
-
-        if accuracy >= xgb_acc:
-            self.model_wins += 1
-            winner = 'model'
+    def xgb_classifier(self):
+        if self.num_of_classes > 2:
+            model = xgb.XGBClassifier(random_state=42, objective='multi:softmax')
         else:
-            winner = 'xgb'
+            model = xgb.XGBClassifier(random_state=42)
+        param_dist = {
+            'max_depth': range(3, 10, 2),
+            'min_child_weight': range(1, 6, 2)
+        }
 
-        print(f'Winner: {winner}')
+        model_cv = self.randomized_search_creation(model, param_dist)
+        return model_cv
 
+    def predicting(self, model, X_test, y_test):
+        res_dict = {}
+        # predict (should measure the time)
+        predict_start_time = time.time()
+        y_pred = model.predict(X_test)
+        curr_predict_time = time.time() - predict_start_time
+        # predict time for 1000 samples
+        predict_time = curr_predict_time * (1000 / X_test.shape[0])
 
-    def xgb_classifier(self, X_train, y_train, X_test, y_test, n_classes):
-        xgb_model = xgb.XGBClassifier(random_state=42)
-        xgb_model.fit(X_train, y_train)
-        y_pred = xgb_model.predict(X_test)
-        return accuracy_score(y_test, y_pred)
+        TPR = FPR = Precision = Accuracy = AUC = PR_Curve = 0
+        if self.num_of_classes > 2:
+            y_pred_prob = model.predict_proba(X_test)
+            confusion_matrices = metrics.multilabel_confusion_matrix(y_test, y_pred)
+            TPR = FPR = Precision = 0
+            for cm in confusion_matrices:
+                tn, fp, fn, tp = cm[0][0], cm[0][1], cm[1][0], cm[1][1]
+                TPR += tp / (tp + fn)
+                FPR += fp / (fp + tn)
+                Precision += tp / (tp + fp)
+
+            TPR /= self.num_of_classes
+            FPR /= self.num_of_classes
+            Precision /= self.num_of_classes
+            Accuracy = metrics.accuracy_score(y_test, y_pred)
+            AUC = metrics.roc_auc_score(y_test, y_pred_prob, multi_class="ovr", average="macro")
+            PR_Curve = 1#metrics.average_precision_score(y_test, y_pred, average="macro")
+        else:
+            cm = metrics.confusion_matrix(y_test, y_pred)
+            tn, fp, fn, tp = cm[0][0], cm[0][1], cm[1][0], cm[1][1]
+            TPR = tp / (tp + fn)
+            FPR = fp / (fp + tn)
+            Precision = tp / (tp + fp)
+            Accuracy = metrics.accuracy_score(y_test, y_pred)
+            AUC = metrics.roc_auc_score(y_test, y_pred)
+            PR_Curve = metrics.average_precision_score(y_test, y_pred)
+
+        res_dict['TPR'] = TPR
+        res_dict['FPR'] = FPR
+        res_dict['Precision'] = Precision
+        res_dict['Accuracy'] = Accuracy
+        res_dict['AUC'] = AUC
+        res_dict['PR_Curve'] = PR_Curve
+        res_dict['InferenceTime'] = predict_time
+
+        return res_dict
+
+    def write_result_table_to_file(self, algo_name, best_params_str, value_dict, train_time):
+        res = f"{self.current_dataset_name}, {algo_name}, {self.cv_iteration_number}, {best_params_str}, " \
+              f"{value_dict['Accuracy']:.2f}, {value_dict['TPR']:.2f}, {value_dict['FPR']:.2f}, " \
+              f"{value_dict['Precision']:.2f}, {value_dict['AUC']:.2f}, {value_dict['PR_Curve']:.2f}, {train_time:.2f}," \
+              f" {value_dict['InferenceTime']:.2f}"
+
+        utils.append_to_csv_file(self.output_csv_file_path, res)
 
 
 if __name__ == '__main__':
