@@ -6,7 +6,7 @@ import xgboost as xgb
 
 from sklearn import metrics
 from sklearn.model_selection import RandomizedSearchCV
-from sklearn.model_selection import KFold
+from sklearn.model_selection import StratifiedKFold
 
 
 class Framework():
@@ -19,6 +19,7 @@ class Framework():
 
     def start(self):
         for ds in self.__datasets:
+            print(ds)
             self.current_dataset_name = utils.get_filename(ds)
             X, y = utils.preprocess_data(ds)
             self.classes_names = utils.get_classes_names(y)
@@ -28,9 +29,9 @@ class Framework():
         print(f'model won in {self.model_wins} \ {self.counter}')
 
     def k_folds_cross_validation(self, X, y):
-        kf = KFold(n_splits=10, shuffle=False)
+        kf = StratifiedKFold(n_splits=10, shuffle=False)
         self.cv_iteration_number = 1
-        for train_index, test_index in kf.split(X):
+        for train_index, test_index in kf.split(X, y):
             # Split train-test
             X_train, X_test = X[train_index], X[test_index]
             y_train, y_test = y[train_index], y[test_index]
@@ -62,7 +63,7 @@ class Framework():
         return model.best_estimator_, model.best_params_, train_time
 
     def randomized_search_creation(self, model, params):
-        return RandomizedSearchCV(model, params, n_iter=50, scoring='accuracy', cv=3)
+        return RandomizedSearchCV(model, params, n_iter=12, scoring='accuracy', cv=3)
 
     def broof_classiefier(self):
         model = BROOF(M=10, n_trees=5)
@@ -103,7 +104,7 @@ class Framework():
                 tn, fp, fn, tp = cm[0][0], cm[0][1], cm[1][0], cm[1][1]
                 TPR += tp / (tp + fn)
                 FPR += fp / (fp + tn)
-                Precision += tp / (tp + fp)
+                Precision += tp / (tp + fp) if tp != 0 else (1 if fp == 0 else 0)
 
             TPR /= self.num_of_classes
             FPR /= self.num_of_classes
@@ -116,7 +117,7 @@ class Framework():
             tn, fp, fn, tp = cm[0][0], cm[0][1], cm[1][0], cm[1][1]
             TPR = tp / (tp + fn)
             FPR = fp / (fp + tn)
-            Precision = tp / (tp + fp)
+            Precision = tp / (tp + fp) if tp != 0 else (1 if fp == 0 else 0)
             Accuracy = metrics.accuracy_score(y_test, y_pred)
             AUC = metrics.roc_auc_score(y_test, y_pred)
             PR_Curve = metrics.average_precision_score(y_test, y_pred)
