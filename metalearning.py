@@ -3,6 +3,8 @@ import pandas as pd
 import random
 
 import xgboost as xgb
+from xgboost import plot_importance
+from matplotlib import pyplot
 
 def metalearning(classificationfeatures):
     metafeatures = pd.read_csv(classificationfeatures)
@@ -29,22 +31,31 @@ def create_labels(df):
 
 
 def leave_one_out_model(df, i):
-    test = df.iloc[i]
-    train = df.drop(df.index[i])
+
+    test = df.iloc[[i]]
+    test_name = test.iloc[0].loc['dataset']
+    test = test.drop(['dataset'], axis=1)
+    train = df.drop(df.index[i]).drop(['dataset'], axis=1)
+
+    X_train = train.drop(['label'], axis=1)
+    y_train = train['label']
+    X_test = test.drop(['label'], axis=1)
+    y_test = test['label']
 
     model = xgb.XGBClassifier(random_state=42, objective='binary:logistic')
+    model.fit(X_train, y_train)
 
-    print(test['dataset'])
+    plot_importance(model)
+    pyplot.savefig("feature importances/" + test_name + "_feature_importances.png")
+    # pyplot.show()
+
+    # TODO: cross validation wrapper with k = n --> meaning leave one out
+    # TODO: plot just one feature importance
+
+    print(test_name)
     # print(i)
     # print(test)
     # print(train.head())
-
-
-def write_result_table_to_file(self, algo_name, best_params_str, value_dict, train_time):
-    res = f"{self.current_dataset_name}, {algo_name}, {self.cv_iteration_number}, {best_params_str}, " \
-          f"{value_dict['Accuracy']:.2f}, {value_dict['TPR']:.2f}, {value_dict['FPR']:.2f}, " \
-          f"{value_dict['Precision']:.2f}, {value_dict['AUC']:.2f}, {value_dict['PR_Curve']:.2f}, {train_time:.2f}," \
-          f" {value_dict['InferenceTime']:.2f}"
 
 if __name__ == '__main__':
     metalearning('ClassificationAllMetaFeatures.csv')
