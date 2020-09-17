@@ -5,8 +5,11 @@ from broof import BROOF
 import xgboost as xgb
 
 from sklearn import metrics
+from sklearn.preprocessing import label_binarize
+from sklearn.multiclass import OneVsRestClassifier
 from sklearn.model_selection import RandomizedSearchCV
 from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import KFold
 
 
 class Framework():
@@ -24,12 +27,13 @@ class Framework():
             X, y = utils.preprocess_data(ds)
             self.classes_names = utils.get_classes_names(y)
             self.num_of_classes = len(self.classes_names)
+            y = label_binarize(y, classes=self.classes_names)
             self.k_folds_cross_validation(X, y)
 
         print(f'model won in {self.model_wins} \ {self.counter}')
 
     def k_folds_cross_validation(self, X, y):
-        kf = StratifiedKFold(n_splits=10, shuffle=False)
+        kf = KFold(n_splits=10, shuffle=False)
         self.cv_iteration_number = 1
         for train_index, test_index in kf.split(X, y):
             # Split train-test
@@ -67,24 +71,28 @@ class Framework():
 
     def broof_classiefier(self):
         model = BROOF(M=10, n_trees=5)
-        param_dist = {'M': [2, 5, 10, 15],
-                      'n_trees': [5, 10, 15, 20]}
+        model_to_set = OneVsRestClassifier(model)
 
-        model_cv = self.randomized_search_creation(model, param_dist)
-        return model_cv
-
-    def xgb_classifier(self):
-        if self.num_of_classes > 2:
-            model = xgb.XGBClassifier(random_state=42, objective='multi:softmax')
-        else:
-            model = xgb.XGBClassifier(random_state=42)
         param_dist = {
-            'max_depth': range(3, 10, 2),
-            'min_child_weight': range(1, 6, 2)
+            'estimator__M': [2, 5, 10, 15],
+            'estimator__n_trees': [5, 10, 15, 20]
         }
 
-        model_cv = self.randomized_search_creation(model, param_dist)
-        return model_cv
+        model_tuning = self.randomized_search_creation(model_to_set, param_dist)
+        return model_tuning
+
+    def xgb_classifier(self):
+        model = xgb.XGBClassifier(random_state=42)
+
+        model_to_set = OneVsRestClassifier(model)
+
+        param_dist = {
+            'estimator__max_depth': range(3, 10, 2),
+            'estimator__min_child_weight': range(1, 6, 2)
+        }
+
+        model_tuning = self.randomized_search_creation(model_to_set, param_dist)
+        return model_tuning
 
     def predicting(self, model, X_test, y_test):
         res_dict = {}
@@ -92,35 +100,42 @@ class Framework():
         predict_start_time = time.time()
         y_pred = model.predict(X_test)
         curr_predict_time = time.time() - predict_start_time
+        y_score = model.predict_proba(X_test)
         # predict time for 1000 samples
         predict_time = curr_predict_time * (1000 / X_test.shape[0])
 
+        fpr = dict()
+        tpr = dict()
+        roc_auc = dict()
+        for i in range(self.num_of_classes):
+            fpr[i], tpr[i], _ = metrics.roc_curve(y_test[:, i], y_score[:, i])
+            roc_auc[i] = metrics.auc(fpr[i], tpr[i])
+
+        # Compute micro-average ROC curve and ROC area
+        fpr["micro"], tpr["micro"], _ = metrics.roc_curve(y_test.ravel(), y_score.ravel())
+
+        roc_auc["micro"] = metrics.auc(fpr["micro"], tpr["micro"])
+
         TPR = FPR = Precision = Accuracy = AUC = PR_Curve = 0
-        if self.num_of_classes > 2:
-            y_pred_prob = model.predict_proba(X_test)
-            confusion_matrices = metrics.multilabel_confusion_matrix(y_test, y_pred)
-            TPR = FPR = Precision = 0
-            for cm in confusion_matrices:
+        # Compute ROC curve and ROC area for each class PER FOLD
+        for i in range(self.num_of_classes):
+            cm = metrics.confusion_matrix(y_test[:, i], y_pred[:, i])
+            try:
                 tn, fp, fn, tp = cm[0][0], cm[0][1], cm[1][0], cm[1][1]
                 TPR += tp / (tp + fn)
                 FPR += fp / (fp + tn)
                 Precision += tp / (tp + fp) if tp != 0 else (1 if fp == 0 else 0)
+            except:
+                a = 1
 
-            TPR /= self.num_of_classes
-            FPR /= self.num_of_classes
-            Precision /= self.num_of_classes
-            Accuracy = metrics.accuracy_score(y_test, y_pred)
-            AUC = metrics.roc_auc_score(y_test, y_pred_prob, multi_class="ovr", average="macro")
-            PR_Curve = 1#metrics.average_precision_score(y_test, y_pred, average="macro")
-        else:
-            cm = metrics.confusion_matrix(y_test, y_pred)
-            tn, fp, fn, tp = cm[0][0], cm[0][1], cm[1][0], cm[1][1]
-            TPR = tp / (tp + fn)
-            FPR = fp / (fp + tn)
-            Precision = tp / (tp + fp) if tp != 0 else (1 if fp == 0 else 0)
-            Accuracy = metrics.accuracy_score(y_test, y_pred)
-            AUC = metrics.roc_auc_score(y_test, y_pred)
-            PR_Curve = metrics.average_precision_score(y_test, y_pred)
+
+        TPR /= self.num_of_classes
+        FPR /= self.num_of_classes
+        Precision /= self.num_of_classes
+        Accuracy = metrics.accuracy_score(y_test, y_pred)
+
+        AUC = metrics.roc_auc_score(y_test, y_score, multi_class="ovr", average="micro")
+        PR_Curve = metrics.average_precision_score(y_test, y_score, average="micro")
 
         res_dict['TPR'] = TPR
         res_dict['FPR'] = FPR
