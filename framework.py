@@ -1,11 +1,12 @@
 import utils
 import time
-from broof import BROOF
+import numpy as np
 
+from broof import BROOF
 import xgboost as xgb
 
 from sklearn import metrics
-from sklearn.model_selection import RandomizedSearchCV
+from sklearn.model_selection import RandomizedSearchCV, KFold
 from sklearn.model_selection import StratifiedKFold
 
 
@@ -30,6 +31,7 @@ class Framework():
 
     def k_folds_cross_validation(self, X, y):
         kf = StratifiedKFold(n_splits=10, shuffle=False)
+        # kf = KFold(n_splits=10, shuffle=False)
         self.cv_iteration_number = 1
         for train_index, test_index in kf.split(X, y):
             # Split train-test
@@ -37,12 +39,14 @@ class Framework():
             y_train, y_test = y[train_index], y[test_index]
 
             # Train the model
+            print(self.cv_iteration_number)
             self.fit_and_predict(X_train, X_test, y_train, y_test)
 
             self.cv_iteration_number += 1
 
     def fit_and_predict(self, X_train, X_test, y_train, y_test):
         # BROOF model training & testing
+        print('BROOF')
         broof_cv = self.broof_classiefier()
         best_broof, best_params, train_time = self.randomized_search_fit(broof_cv, X_train, y_train)
         best_params_str = utils.dict_to_str(best_params)
@@ -50,13 +54,14 @@ class Framework():
         self.write_result_table_to_file('BROOF', best_params_str, value_dict, train_time)
 
         # XGBoost model training & testing
+        print('xgb')
         xgb_cv = self.xgb_classifier()
         best_xgb, best_params, train_time = self.randomized_search_fit(xgb_cv, X_train, y_train)
         value_dict = self.predicting(best_xgb, X_test, y_test)
         self.write_result_table_to_file('XGBoost', best_params_str, value_dict, train_time)
 
     def randomized_search_fit(self, model, X_train, y_train):
-        print("Randomized search..")
+        # print("Randomized search..")
         search_start_time = time.time()
         model.fit(X_train, y_train)
         train_time = time.time() - search_start_time
@@ -102,15 +107,21 @@ class Framework():
             TPR = FPR = Precision = 0
             for cm in confusion_matrices:
                 tn, fp, fn, tp = cm[0][0], cm[0][1], cm[1][0], cm[1][1]
-                TPR += tp / (tp + fn)
-                FPR += fp / (fp + tn)
+                TPR += tp / (tp + fn) if tp != 0 else (1 if fn == 0 else 0)
+                FPR += fp / (fp + tn) if fp != 0 else (1 if tn == 0 else 0)
                 Precision += tp / (tp + fp) if tp != 0 else (1 if fp == 0 else 0)
 
             TPR /= self.num_of_classes
             FPR /= self.num_of_classes
             Precision /= self.num_of_classes
             Accuracy = metrics.accuracy_score(y_test, y_pred)
-            AUC = metrics.roc_auc_score(y_test, y_pred_prob, multi_class="ovr", average="macro")
+            # print(y_pred_prob.shape)
+            # print(np.unique(y_test))
+            # print(len(np.unique(y_test)))
+            try:
+                AUC = metrics.roc_auc_score(y_test, y_pred_prob, multi_class="ovr", average="macro")
+            except:
+                AUC = None
             PR_Curve = 1#metrics.average_precision_score(y_test, y_pred, average="macro")
         else:
             cm = metrics.confusion_matrix(y_test, y_pred)
@@ -133,11 +144,16 @@ class Framework():
         return res_dict
 
     def write_result_table_to_file(self, algo_name, best_params_str, value_dict, train_time):
-        res = f"{self.current_dataset_name}, {algo_name}, {self.cv_iteration_number}, {best_params_str}, " \
-              f"{value_dict['Accuracy']:.2f}, {value_dict['TPR']:.2f}, {value_dict['FPR']:.2f}, " \
-              f"{value_dict['Precision']:.2f}, {value_dict['AUC']:.2f}, {value_dict['PR_Curve']:.2f}, {train_time:.2f}," \
-              f" {value_dict['InferenceTime']:.2f}"
-
+        try:
+            res = f"{self.current_dataset_name}, {algo_name}, {self.cv_iteration_number}, {best_params_str}, " \
+                f"{value_dict['Accuracy']:.2f}, {value_dict['TPR']:.2f}, {value_dict['FPR']:.2f}, " \
+                f"{value_dict['Precision']:.2f}, {value_dict['AUC']:.2f}, {value_dict['PR_Curve']:.2f}, {train_time:.2f}," \
+                f" {value_dict['InferenceTime']:.2f}"
+        except:
+            res = f"{self.current_dataset_name}, {algo_name}, {self.cv_iteration_number}, {best_params_str}, " \
+                  f"{value_dict['Accuracy']:.2f}, {value_dict['TPR']:.2f}, {value_dict['FPR']:.2f}, " \
+                  f"{value_dict['Precision']:.2f}, {'Nan'}, {value_dict['PR_Curve']:.2f}, {train_time:.2f}," \
+                  f" {value_dict['InferenceTime']:.2f}"
         utils.append_to_csv_file(self.output_csv_file_path, res)
 
 
