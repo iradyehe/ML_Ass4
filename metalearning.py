@@ -65,9 +65,9 @@ def create_labels(df):
         labels.append(1 if accuracy_acc_xgb < accuracy_acc_broof else 0)
 
     # todo - remove once all the datasets are good, else it will not work
-    t = len(labels)
-    for i in range(df.shape[0] - t):
-        labels.append(1)
+    # t = len(labels)
+    # for i in range(df.shape[0] - t):
+    #     labels.append(1)
 
     df['label'] = labels
     return df
@@ -89,8 +89,6 @@ def leave_one_out_model(df, i):
     model.fit(X_train, y_train)
 
     pred = model.predict(X_test)
-
-    # TODO: cross validation wrapper with k = n --> meaning leave one out
 
     print(test_name)
     # print(i)
