@@ -67,7 +67,7 @@ class Framework():
         return model.best_estimator_, model.best_params_, train_time
 
     def randomized_search_creation(self, model, params):
-        return RandomizedSearchCV(model, params, n_iter=12, scoring='accuracy', cv=3)
+        return RandomizedSearchCV(model, params, scoring='accuracy', cv=3)
 
     def broof_classiefier(self):
         model = BROOF(M=10, n_trees=5, max_depth=10)
