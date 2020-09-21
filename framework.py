@@ -108,8 +108,26 @@ class Framework():
 
         TPR = FPR = Precision = Accuracy = AUC = PR_Curve = 0
         # Compute ROC curve and ROC area for each class PER FOLD
-        for i in range(self.num_of_classes):
-            cm = metrics.confusion_matrix(y_test[:, i], y_pred[:, i])
+        if self.num_of_classes > 2:
+            for i in range(self.num_of_classes):
+                cm = metrics.confusion_matrix(y_test[:, i], y_pred[:, i])
+                try:
+                    tn, fp, fn, tp = cm[0][0], cm[0][1], cm[1][0], cm[1][1]
+                    TPR += tp / (tp + fn) if tp != 0 else (1 if fn == 0 else 0)
+                    FPR += fp / (fp + tn) if fp != 0 else (1 if tn == 0 else 0)
+                    Precision += tp / (tp + fp) if tp != 0 else (1 if fp == 0 else 0)
+                except:
+                    a = 1
+
+                TPR /= self.num_of_classes
+                FPR /= self.num_of_classes
+                Precision /= self.num_of_classes
+                Accuracy = metrics.accuracy_score(y_test, y_pred)
+
+                AUC = metrics.roc_auc_score(y_test, y_score, multi_class="ovr", average="micro")
+                PR_Curve = metrics.average_precision_score(y_test, y_score, average="micro")
+        else:
+            cm = metrics.confusion_matrix(y_test[:, 0], y_pred)
             try:
                 tn, fp, fn, tp = cm[0][0], cm[0][1], cm[1][0], cm[1][1]
                 TPR += tp / (tp + fn) if tp != 0 else (1 if fn == 0 else 0)
@@ -118,14 +136,9 @@ class Framework():
             except:
                 a = 1
 
-
-        TPR /= self.num_of_classes
-        FPR /= self.num_of_classes
-        Precision /= self.num_of_classes
-        Accuracy = metrics.accuracy_score(y_test, y_pred)
-
-        AUC = metrics.roc_auc_score(y_test, y_score, multi_class="ovr", average="micro")
-        PR_Curve = metrics.average_precision_score(y_test, y_score, average="micro")
+            Accuracy = metrics.accuracy_score(y_test, y_pred)
+            AUC = metrics.roc_auc_score(y_test, y_pred)
+            PR_Curve = metrics.average_precision_score(y_test, y_pred)
 
         res_dict['TPR'] = TPR
         res_dict['FPR'] = FPR
