@@ -7,10 +7,11 @@ from sklearn.ensemble import RandomForestClassifier
 
 class BROOF:
 
-    def __init__(self, M, n_trees):
+    def __init__(self, M, n_trees, max_depth):
 
         self.M = M
         self.n_trees = n_trees
+        self.max_depth = max_depth
 
         self.alphas = []
         self.models = []
@@ -63,7 +64,7 @@ class BROOF:
                 Evaluation.at[items[0], 'weights'] = items[1]
 
     def learn_rf(self, X_train, y_train, t):
-        rf_model = RandomForestClassifier(n_estimators=self.n_trees, bootstrap=True, random_state=t, verbose=0)
+        rf_model = RandomForestClassifier(n_estimators=self.n_trees, max_depth=self.max_depth, bootstrap=True, random_state=t, verbose=0)
 
         model = rf_model.fit(X_train, y_train)
 
@@ -123,7 +124,8 @@ class BROOF:
     def get_params(self, deep=True):
         out = {
             'M': self.M,
-            'n_trees': self.n_trees
+            'n_trees': self.n_trees,
+            'max_depth': self.max_depth
         }
 
         return out

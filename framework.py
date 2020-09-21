@@ -70,12 +70,13 @@ class Framework():
         return RandomizedSearchCV(model, params, n_iter=12, scoring='accuracy', cv=3)
 
     def broof_classiefier(self):
-        model = BROOF(M=10, n_trees=5)
+        model = BROOF(M=10, n_trees=5, max_depth=10)
         model_to_set = OneVsRestClassifier(model)
 
         param_dist = {
-            'estimator__M': [2, 5, 10, 15],
-            'estimator__n_trees': [5, 10, 15, 20]
+            'estimator__M': [2, 5, 8, 10],
+            'estimator__n_trees': [2, 5, 10, 15],
+            'estimator__max_depth': [10, 50, 100, None]
         }
 
         model_tuning = self.randomized_search_creation(model_to_set, param_dist)
@@ -88,7 +89,8 @@ class Framework():
 
         param_dist = {
             'estimator__max_depth': range(3, 10, 2),
-            'estimator__min_child_weight': range(1, 6, 2)
+            'estimator__min_child_weight': range(1, 6, 2),
+            'estimator__eta': [.3, .2, .1, .05, .01, .005]
         }
 
         model_tuning = self.randomized_search_creation(model_to_set, param_dist)
@@ -104,26 +106,14 @@ class Framework():
         # predict time for 1000 samples
         predict_time = curr_predict_time * (1000 / X_test.shape[0])
 
-        fpr = dict()
-        tpr = dict()
-        roc_auc = dict()
-        for i in range(self.num_of_classes):
-            fpr[i], tpr[i], _ = metrics.roc_curve(y_test[:, i], y_score[:, i])
-            roc_auc[i] = metrics.auc(fpr[i], tpr[i])
-
-        # Compute micro-average ROC curve and ROC area
-        fpr["micro"], tpr["micro"], _ = metrics.roc_curve(y_test.ravel(), y_score.ravel())
-
-        roc_auc["micro"] = metrics.auc(fpr["micro"], tpr["micro"])
-
         TPR = FPR = Precision = Accuracy = AUC = PR_Curve = 0
         # Compute ROC curve and ROC area for each class PER FOLD
         for i in range(self.num_of_classes):
             cm = metrics.confusion_matrix(y_test[:, i], y_pred[:, i])
             try:
                 tn, fp, fn, tp = cm[0][0], cm[0][1], cm[1][0], cm[1][1]
-                TPR += tp / (tp + fn)
-                FPR += fp / (fp + tn)
+                TPR += tp / (tp + fn) if tp != 0 else (1 if fn == 0 else 0)
+                FPR += fp / (fp + tn) if fp != 0 else (1 if tn == 0 else 0)
                 Precision += tp / (tp + fp) if tp != 0 else (1 if fp == 0 else 0)
             except:
                 a = 1
