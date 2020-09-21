@@ -102,13 +102,14 @@ class Framework():
         predict_start_time = time.time()
         y_pred = model.predict(X_test)
         curr_predict_time = time.time() - predict_start_time
-        y_score = model.predict_proba(X_test)
         # predict time for 1000 samples
         predict_time = curr_predict_time * (1000 / X_test.shape[0])
 
         TPR = FPR = Precision = Accuracy = AUC = PR_Curve = 0
         # Compute ROC curve and ROC area for each class PER FOLD
         if self.num_of_classes > 2:
+            y_score = model.predict_proba(X_test)
+
             for i in range(self.num_of_classes):
                 cm = metrics.confusion_matrix(y_test[:, i], y_pred[:, i])
                 try:
