@@ -124,7 +124,11 @@ class Framework():
                 Precision /= self.num_of_classes
                 Accuracy = metrics.accuracy_score(y_test, y_pred)
 
-                AUC = metrics.roc_auc_score(y_test, y_score, multi_class="ovr", average="micro")
+                try:
+                    AUC = metrics.roc_auc_score(y_test, y_score, multi_class="ovr", average="micro")
+                except:
+                    AUC = 'Not Defined'
+
                 PR_Curve = metrics.average_precision_score(y_test, y_score, average="micro")
         else:
             cm = metrics.confusion_matrix(y_test[:, 0], y_pred)
@@ -137,7 +141,10 @@ class Framework():
                 a = 1
 
             Accuracy = metrics.accuracy_score(y_test, y_pred)
-            AUC = metrics.roc_auc_score(y_test, y_pred)
+            try:
+                AUC = metrics.roc_auc_score(y_test, y_pred)
+            except:
+                AUC = 'Not Defined'
             PR_Curve = metrics.average_precision_score(y_test, y_pred)
 
         res_dict['TPR'] = TPR
@@ -151,9 +158,12 @@ class Framework():
         return res_dict
 
     def write_result_table_to_file(self, algo_name, best_params_str, value_dict, train_time):
+        auc = value_dict['AUC'] if type(value_dict['AUC']) == str else float("{:.2f}".format(value_dict['AUC']))
         res = f"{self.current_dataset_name}, {algo_name}, {self.cv_iteration_number}, {best_params_str}, " \
               f"{value_dict['Accuracy']:.2f}, {value_dict['TPR']:.2f}, {value_dict['FPR']:.2f}, " \
-              f"{value_dict['Precision']:.2f}, {value_dict['AUC']:.2f}, {value_dict['PR_Curve']:.2f}, {train_time:.2f}," \
+              f"{value_dict['Precision']:.2f}, " \
+              f"{auc}, " \
+              f"{value_dict['PR_Curve']:.2f}, {train_time:.2f}," \
               f" {value_dict['InferenceTime']:.2f}"
 
         utils.append_to_csv_file(self.output_csv_file_path, res)
