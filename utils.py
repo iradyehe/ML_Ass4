@@ -48,8 +48,12 @@ def preprocess_data(ds):
     # read the ds into df
     df = pd.read_csv(ds)
 
-    # remove nulls
-    df.dropna(inplace=True)
+    # fill nulls
+    df.fillna(method='ffill', inplace=True)
+    df.fillna(method='bfill', inplace=True)
+
+    # encoding categorical columns and label
+    df = columns_and_label_encoder(df)
 
     # encoding categorical columns and label
     df = columns_and_label_encoder(df)
