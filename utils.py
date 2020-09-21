@@ -10,7 +10,7 @@ from sklearn.preprocessing import LabelEncoder
 
 
 def get_all_datasets_full_path():
-    return get_all_files_path_in_folder('datasets')
+    return get_all_files_path_in_folder('classification_datasets')
 
 
 def get_all_files_path_in_folder(folder_path):
