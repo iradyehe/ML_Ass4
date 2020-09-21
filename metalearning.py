@@ -13,7 +13,7 @@ from sklearn.model_selection import train_test_split
 def metalearning(classificationfeatures):
     metafeatures = pd.read_csv(classificationfeatures)
     print(metafeatures.head())
-    metafeatures_labeled = create_dummy_labels(metafeatures)  # TODO: after the framework is complete, use create_labels() function
+    metafeatures_labeled = create_labels(metafeatures)
     print(metafeatures_labeled.head())
 
     predicted_labels = []
@@ -50,7 +50,22 @@ def create_dummy_labels(df):
 
 
 def create_labels(df):
-    pass
+    labels = []
+    output_df = pd.read_csv('output.csv')
+    for i in range(int(output_df.shape[0] / 20)):  # 0 - 149
+        accuracy_acc_broof = 0
+        accuracy_acc_xgb = 0
+        for j in range(0, 20, 2):
+            row_broof = output_df.iloc[[i*20 + j]]
+            row_xgb = output_df.iloc[[i*20 + j + 1]]
+            accuracy_acc_broof += row_broof.iloc[0]['Accuracy']
+            accuracy_acc_xgb += row_xgb.iloc[0]['Accuracy']
+        accuracy_acc_broof /= 10
+        accuracy_acc_xgb /= 10
+        labels.append(1 if accuracy_acc_xgb < accuracy_acc_broof else 0)
+
+    df['label'] = labels
+    return df
 
 
 def leave_one_out_model(df, i):
@@ -69,8 +84,6 @@ def leave_one_out_model(df, i):
     model.fit(X_train, y_train)
 
     pred = model.predict(X_test)
-
-    # TODO: cross validation wrapper with k = n --> meaning leave one out
 
     print(test_name)
     # print(i)
@@ -120,7 +133,9 @@ def feature_importances_calc(df):
         w.writerow(importance_cover)
 
     shap_values = model.get_booster().predict(xgb.DMatrix(X_test), pred_contribs=True)
-    pd.DataFrame(shap_values).to_csv('feature importances/shap_values.csv')
+    shap_values_df = pd.DataFrame(shap_values)
+    shap_values_df.columns = dataset.columns
+    shap_values_df.to_csv('feature importances/shap_values.csv')
 
     print('nigerundayooo')
 

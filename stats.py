@@ -17,11 +17,6 @@ def friedman_test(path):
     print(X_2_f)
     print(F_F)
 
-    # if F_F > the cell at F(1, inf) at the table from:
-    # https://home.ubalt.edu/ntsbarsh/Business-stat/StatistialTables.pdf
-    # then it is statistically significant. in our case it isnt (for now - using 127 datasets)
-    # TODO: run it again once we could get data on all datasets
-
 
 def calc_F_F(N, L, X_2_f):
     return ( (N-1) * X_2_f ) / ( N*(L-1) - X_2_f )
